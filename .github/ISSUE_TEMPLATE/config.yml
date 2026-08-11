@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "Открыть приложение СОСТАВ.SCAN"
+    url: "https://danya-bit0505.github.io/sostav-scan/"
+    about: "Сначала попробуй найти товар в приложении — форма для предложения состава нужна только если товара нигде нет"
