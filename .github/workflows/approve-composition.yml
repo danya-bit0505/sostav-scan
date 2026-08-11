@@ -1,1 +1,95 @@
+name: Approve community composition
 
+# Срабатывает только когда на issue вручную вешают лейбл "approved" —
+# то есть только после того, как модератор (владелец репозитория) проверил данные.
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  commit-composition:
+    if: github.event.label.name == 'approved'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse issue and write JSON
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.issue.body || '';
+
+            // Issue Forms рендерят тело в формате:
+            // ### Метка поля
+            //
+            // значение
+            function extractField(label){
+              const re = new RegExp('### ' + label.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&') + '\\s*\\n\\s*([\\s\\S]*?)(?=\\n### |$)');
+              const m = body.match(re);
+              return m ? m[1].trim() : '';
+            }
+
+            const barcodeRaw = extractField('Штрихкод \\(EAN-13/UPC\\)');
+            const title = extractField('Название товара');
+            const composition = extractField('Состав \\(переписать с упаковки дословно\\)');
+            const photo = extractField('Ссылка на фото упаковки \\(необязательно\\)');
+
+            const barcode = (barcodeRaw.match(/\d{6,14}/) || [null])[0];
+
+            if(!barcode || !title || !composition || composition === '_No response_' || title === '_No response_'){
+              core.setFailed('Не удалось распарсить обязательные поля issue (штрихкод/название/состав). Проверь формат issue вручную.');
+              return;
+            }
+
+            const fs = require('fs');
+            const path = require('path');
+            const dir = path.join('data', 'community');
+            fs.mkdirSync(dir, { recursive: true });
+
+            const filePath = path.join(dir, barcode + '.json');
+            const entry = {
+              code: barcode,
+              title: title,
+              ingredientsText: composition,
+              photo: (photo && photo !== '_No response_') ? photo : null,
+              approvedBy: context.payload.sender.login,
+              issueNumber: context.payload.issue.number,
+              addedAt: new Date().toISOString()
+            };
+            fs.writeFileSync(filePath, JSON.stringify(entry, null, 2) + '\n', 'utf8');
+
+            core.setOutput('barcode', barcode);
+            core.setOutput('filePath', filePath);
+
+      - name: Commit and push
+        run: |
+          git config user.name "sostavscan-bot"
+          git config user.email "actions@github.com"
+          git add data/community/
+          git diff --cached --quiet && echo "Нет изменений" && exit 0
+          git commit -m "community: добавлен состав ${{ steps.parse.outputs.barcode }} (issue #${{ github.event.issue.number }})"
+          git push
+
+      - name: Comment on issue
+        if: steps.parse.outputs.barcode
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '✅ Спасибо! Состав добавлен в базу СОСТАВ.SCAN (штрихкод `' + '${{ steps.parse.outputs.barcode }}' + '`). Обновление появится в приложении в течение пары минут.'
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed'
+            });
