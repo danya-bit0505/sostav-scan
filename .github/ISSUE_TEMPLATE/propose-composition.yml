@@ -1,1 +1,43 @@
+name: "Предложить состав товара"
+description: "Товара нет в Роскачестве и Open Food Facts? Пришли состав вручную — после проверки он появится в базе."
+title: "[состав] "
+labels: ["community-composition"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Заполни поля ниже. После проверки модератором данные попадут в общую базу СОСТАВ.SCAN.
+        Пожалуйста, переписывай состав **точно как на упаковке**, не сокращай и не пересказывай своими словами.
 
+  - type: input
+    id: barcode
+    attributes:
+      label: "Штрихкод (EAN-13/UPC)"
+      description: "Цифры под штрихкодом на упаковке"
+      placeholder: "4607034970014"
+    validations:
+      required: true
+
+  - type: input
+    id: title
+    attributes:
+      label: "Название товара"
+      placeholder: "Например: Сгущённое молоко ГОСТ, 380г"
+    validations:
+      required: true
+
+  - type: textarea
+    id: composition
+    attributes:
+      label: "Состав (переписать с упаковки дословно)"
+      placeholder: "Молоко цельное сгущённое с сахаром, сахар..."
+    validations:
+      required: true
+
+  - type: input
+    id: photo
+    attributes:
+      label: "Ссылка на фото упаковки (необязательно)"
+      description: "Если есть фото состава — прикрепи ссылку на изображение, это ускорит проверку"
+    validations:
+      required: false
