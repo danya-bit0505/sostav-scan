@@ -1103,7 +1103,7 @@ $('recheckCommunityBtn').addEventListener('click', ()=> recheckSource('recheckCo
 
 $('noCompPhotoBtn').addEventListener('click', ()=> $('photoBtn').click());
 $('noCompProposeBtn').addEventListener('click', ()=>{
-  if(lastRenderedCode) window.open(proposeCompositionUrl(lastRenderedCode), '_blank');
+  if(lastRenderedCode) location.href = proposeCompositionUrl(lastRenderedCode);
 });
 
 // --- размер шрифта ---
@@ -1333,7 +1333,7 @@ async function lookup(code, forceRefresh){
       const actions = bothGenuinelyAbsent
         ? [
             {label:'Сфотографировать состав', fn: ()=> $('photoBtn').click()},
-            {label:'Предложить состав', fn: ()=> window.open(proposeCompositionUrl(code), '_blank')}
+            {label:'Предложить состав', fn: ()=> location.href = proposeCompositionUrl(code)}
           ]
         : [
             {label:'Повторить', fn: ()=> lookup(code, true)},
