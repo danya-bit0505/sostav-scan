@@ -734,7 +734,7 @@
       </div>
 
       <div id="noCompositionBlock" style="display:none;">
-        <div class="no-comp-msg">
+        <div class="no-comp-msg" id="noCompMsg">
           ⚠ Товар найден, но текста состава нигде нет — проверять пока нечего, «чисто» тут не гарантия.
         </div>
         <div class="recheck-row">
@@ -946,7 +946,7 @@ function formatHistDate(ts){
 let lastRenderedCode = null;
 let lastRenderedHasComposition = false;
 
-function renderResult({code, title, subtitle, flags, ingredientsText, imgUrl, metaHtml, compositionSource, cachedTs, vibrate}){
+function renderResult({code, title, subtitle, flags, ingredientsText, imgUrl, metaHtml, compositionSource, foundInSources, cachedTs, vibrate}){
   lastRenderedCode = code || null;
   lastRenderedHasComposition = !!ingredientsText;
 
@@ -982,6 +982,11 @@ function renderResult({code, title, subtitle, flags, ingredientsText, imgUrl, me
     ingredientsBlock.style.display = 'none';
     noCompBlock.style.display = 'block';
     resetRecheckButtons();
+
+    const sources = Array.isArray(foundInSources) ? foundInSources.filter(Boolean) : [];
+    $('noCompMsg').textContent = sources.length
+      ? `⚠ Товар найден в: ${sources.join(', ')} — но текста состава нигде нет. Проверять пока нечего, «чисто» тут не гарантия.`
+      : `⚠ Текста состава нигде нет — проверять пока нечего, «чисто» тут не гарантия.`;
   } else {
     noCompBlock.style.display = 'none';
     if(flags.length===0){
@@ -1286,7 +1291,8 @@ async function lookup(code, forceRefresh){
       renderResult({
         code: cached.code, title: cached.title, subtitle: cached.subtitle, flags: cached.flags,
         ingredientsText: cached.ingredientsText, imgUrl: cached.imgUrl,
-        metaHtml: cached.metaHtml, compositionSource: cached.compositionSource, cachedTs: cached.ts, vibrate: true
+        metaHtml: cached.metaHtml, compositionSource: cached.compositionSource, foundInSources: cached.foundInSources,
+        cachedTs: cached.ts, vibrate: true
       });
       return;
     }
@@ -1340,8 +1346,10 @@ async function lookup(code, forceRefresh){
 
     let flags = [], ingredientsText = '', title = null, imgUrl = null, compositionSource = null;
     const meta = [];
+    const foundInSources = [];
 
     if(offOk){
+      foundInSources.push('Open Food Facts');
       const product = offData.product;
       const off = classify(product);
       ingredientsText = product.ingredients_text_ru || product.ingredients_text || '';
@@ -1353,6 +1361,7 @@ async function lookup(code, forceRefresh){
     }
 
     if(rk){
+      foundInSources.push('Роскачество');
       if(!title) title = rk.name;
       if(!imgUrl) imgUrl = rk.imgUrl;
       if(rk.rating!=null) meta.push(`<div class="chip">Роскачество: ${rk.rating}★</div>`);
@@ -1370,6 +1379,7 @@ async function lookup(code, forceRefresh){
     // состав от сообщества — последний по приоритету источник, только если ничего другого нет,
     // и всегда явно помечен как непроверенный
     if(community && !ingredientsText){
+      foundInSources.push('базе сообщества');
       if(!title) title = community.title;
       ingredientsText = community.ingredientsText;
       flags = classifyOcrText(community.ingredientsText);
@@ -1382,11 +1392,11 @@ async function lookup(code, forceRefresh){
 
     saveToHistory({
       code, title: finalTitle, subtitle: code,
-      level: riskLevel(flags), flags, ingredientsText, imgUrl, metaHtml, compositionSource,
+      level: riskLevel(flags), flags, ingredientsText, imgUrl, metaHtml, compositionSource, foundInSources,
       ts: Date.now()
     });
 
-    renderResult({ code, title: finalTitle, subtitle: code, flags, ingredientsText, imgUrl, metaHtml, compositionSource, vibrate: true });
+    renderResult({ code, title: finalTitle, subtitle: code, flags, ingredientsText, imgUrl, metaHtml, compositionSource, foundInSources, vibrate: true });
   }catch(e){
     showRetryError('Непредвиденная ошибка при поиске товара. ', ()=> lookup(code, true));
   }finally{
@@ -1502,7 +1512,8 @@ function renderHistoryList(){
       renderResult({
         code: item.code, title: item.title, subtitle: item.subtitle, flags: item.flags,
         ingredientsText: item.ingredientsText, imgUrl: item.imgUrl,
-        metaHtml: item.metaHtml, compositionSource: item.compositionSource, cachedTs: item.ts, vibrate: false
+        metaHtml: item.metaHtml, compositionSource: item.compositionSource, foundInSources: item.foundInSources,
+        cachedTs: item.ts, vibrate: false
       });
     });
     container.appendChild(row);
