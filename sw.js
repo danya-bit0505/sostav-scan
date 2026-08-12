@@ -2,8 +2,12 @@
 // Кэширует "оболочку" приложения (HTML/манифест/иконку), чтобы интерфейс, история
 // и безопасная полка открывались даже без сети. Сами запросы к базам составов
 // (Роскачество, Open Food Facts) по-прежнему требуют интернета — это ожидаемо.
+//
+// Стратегия: network-first — при наличии сети всегда показываем самую свежую версию
+// (важно, пока приложение часто обновляется), кэш используется только как офлайн-фолбэк,
+// когда сети реально нет.
 
-const CACHE_NAME = 'sostavscan-shell-v2';
+const CACHE_NAME = 'sostavscan-shell-v3';
 const APP_SHELL = [
   './',
   './index.html',
@@ -43,16 +47,12 @@ self.addEventListener('fetch', (event)=>{
   if(url.origin !== self.location.origin) return;
 
   event.respondWith(
-    caches.match(req).then(cached=>{
-      const network = fetch(req).then(res=>{
-        if(res && res.ok){
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then(c=> c.put(req, clone));
-        }
-        return res;
-      }).catch(()=> cached);
-      // если есть кэш — отдаём его мгновенно и обновляем в фоне; если нет — ждём сеть
-      return cached || network;
-    })
+    fetch(req, {cache:'no-store'}).then(res=>{
+      if(res && res.ok){
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then(c=> c.put(req, clone));
+      }
+      return res;
+    }).catch(()=> caches.match(req)) // сети нет — отдаём то, что успели закэшировать раньше
   );
 });
