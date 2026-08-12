@@ -400,6 +400,7 @@
   .stamp.safe{background:var(--safe);}
   .stamp.warn{background:var(--warn);}
   .stamp.danger{background:var(--danger);}
+  .stamp.nodata{background:var(--muted);}
 
   .product-card{
     background:var(--panel);
@@ -447,6 +448,47 @@
     color:#fff;
     font-weight:600;
   }
+
+  .source-row{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:0.68rem;
+    color:var(--muted);
+    letter-spacing:0.04em;
+    margin-top:6px;
+  }
+  .source-row b{color:var(--accent);font-weight:700;}
+
+  .no-comp-msg{
+    background:var(--panel2);
+    border:1.5px dashed var(--warn);
+    border-radius:14px;
+    padding:12px 14px;
+    font-size:0.88rem;
+    color:var(--text);
+    line-height:1.45;
+  }
+  .recheck-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-top:10px;
+  }
+  .recheck-btn{
+    flex:1;
+    min-width:120px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    color:var(--text);
+    padding:9px 10px;
+    border-radius:10px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:0.72rem;
+    cursor:pointer;
+  }
+  .recheck-btn:active{transform:scale(0.97);}
+  .recheck-btn.busy{opacity:0.5;pointer-events:none;}
+  .recheck-btn.found{border-color:var(--safe);color:var(--safe);}
+  .recheck-btn.empty{border-color:var(--line);color:var(--muted);}
 
   .ingredients-text{
     font-size:0.9rem;
@@ -681,12 +723,31 @@
         </div>
       </div>
 
+      <div id="sourceRow" class="source-row" style="display:none;"></div>
+
       <div class="section-title">Обнаруженные добавки</div>
       <div id="flagsList"></div>
 
       <div id="ingredientsBlock" style="display:none;">
         <div class="section-title">Состав</div>
         <div class="ingredients-text" id="ingredientsText"></div>
+      </div>
+
+      <div id="noCompositionBlock" style="display:none;">
+        <div class="no-comp-msg">
+          ⚠ Товар найден, но текста состава нигде нет — проверять пока нечего, «чисто» тут не гарантия.
+        </div>
+        <div class="recheck-row">
+          <button type="button" class="recheck-btn" id="recheckOffBtn">⟳ Open Food Facts</button>
+          <button type="button" class="recheck-btn" id="recheckRkBtn">⟳ Роскачество</button>
+          <button type="button" class="recheck-btn" id="recheckCommunityBtn">⟳ Сообщество</button>
+        </div>
+        <div class="actions" style="margin-top:10px;">
+          <button type="button" class="btn btn-primary" id="noCompPhotoBtn">Сфотографировать состав</button>
+        </div>
+        <div class="actions" style="margin-top:8px;">
+          <button type="button" class="btn btn-secondary" id="noCompProposeBtn">Предложить состав в базу</button>
+        </div>
       </div>
 
       <div class="meta-row" id="metaRow"></div>
@@ -883,12 +944,18 @@ function formatHistDate(ts){
 
 // --- общий рендер результата (используется и поиском по базе, и распознаванием фото, и историей) ---
 let lastRenderedCode = null;
+let lastRenderedHasComposition = false;
 
-function renderResult({code, title, subtitle, flags, ingredientsText, imgUrl, metaHtml, cachedTs, vibrate}){
+function renderResult({code, title, subtitle, flags, ingredientsText, imgUrl, metaHtml, compositionSource, cachedTs, vibrate}){
   lastRenderedCode = code || null;
-  const level = riskLevel(flags);
+  lastRenderedHasComposition = !!ingredientsText;
+
+  const noComposition = !ingredientsText;
+  const level = noComposition ? 'nodata' : riskLevel(flags);
   $('stamp').className = 'stamp '+level;
-  $('stamp').textContent = level==='safe' ? 'Спорных добавок не найдено' : level==='warn' ? 'Есть спорные добавки' : 'Обнаружены вредные добавки';
+  $('stamp').textContent = noComposition
+    ? 'Нет данных о составе'
+    : (level==='safe' ? 'Спорных добавок не найдено' : level==='warn' ? 'Есть спорные добавки' : 'Обнаружены вредные добавки');
 
   const prodImg = $('prodImg');
   prodImg.onerror = ()=>{ prodImg.classList.add('empty'); prodImg.removeAttribute('src'); };
@@ -897,24 +964,39 @@ function renderResult({code, title, subtitle, flags, ingredientsText, imgUrl, me
   $('prodName').textContent = title || 'Без названия';
   $('prodCode').textContent = subtitle || '';
 
-  const flagsList = $('flagsList');
-  flagsList.innerHTML = '';
-  if(flags.length===0){
-    flagsList.innerHTML = `<div class="clean-msg">✓ Известных вредных добавок и пальмового масла не обнаружено</div>`;
+  const sourceRow = $('sourceRow');
+  if(compositionSource){
+    sourceRow.style.display = 'block';
+    sourceRow.innerHTML = 'Источник состава: <b>' + compositionSource + '</b>';
   } else {
-    flags.forEach(f=>{
-      const div = document.createElement('div');
-      div.className = 'flag '+(f.risk==='high'?'':'medium');
-      div.innerHTML = `<div class="flag-ico">${f.risk==='high'?'⚠️':'●'}</div><div class="flag-body"><b>${f.code!=='ПАЛЬМ'?f.code+' — ':''}${f.name}</b><p>${f.note}</p></div>`;
-      flagsList.appendChild(div);
-    });
+    sourceRow.style.display = 'none';
   }
 
-  if(ingredientsText){
-    $('ingredientsBlock').style.display='block';
-    $('ingredientsText').innerHTML = highlightIngredients(ingredientsText, flags);
+  const flagsList = $('flagsList');
+  const noCompBlock = $('noCompositionBlock');
+  const ingredientsBlock = $('ingredientsBlock');
+
+  if(noComposition){
+    // честно показываем, что проверять было нечего, вместо ложного "чисто"
+    flagsList.innerHTML = '';
+    ingredientsBlock.style.display = 'none';
+    noCompBlock.style.display = 'block';
+    resetRecheckButtons();
   } else {
-    $('ingredientsBlock').style.display='none';
+    noCompBlock.style.display = 'none';
+    if(flags.length===0){
+      flagsList.innerHTML = `<div class="clean-msg">✓ Известных вредных добавок и пальмового масла не обнаружено</div>`;
+    } else {
+      flagsList.innerHTML = '';
+      flags.forEach(f=>{
+        const div = document.createElement('div');
+        div.className = 'flag '+(f.risk==='high'?'':'medium');
+        div.innerHTML = `<div class="flag-ico">${f.risk==='high'?'⚠️':'●'}</div><div class="flag-body"><b>${f.code!=='ПАЛЬМ'?f.code+' — ':''}${f.name}</b><p>${f.note}</p></div>`;
+        flagsList.appendChild(div);
+      });
+    }
+    ingredientsBlock.style.display = 'block';
+    $('ingredientsText').innerHTML = highlightIngredients(ingredientsText, flags);
   }
 
   $('metaRow').innerHTML = metaHtml || '';
@@ -932,6 +1014,92 @@ function renderResult({code, title, subtitle, flags, ingredientsText, imgUrl, me
   $('resultScreen').scrollTop = 0;
   if(vibrate) vibrateOk();
 }
+
+function resetRecheckButtons(){
+  ['recheckOffBtn','recheckRkBtn','recheckCommunityBtn'].forEach(id=>{
+    const btn = $(id);
+    btn.classList.remove('busy','found','empty');
+    btn.disabled = false;
+  });
+  $('recheckOffBtn').textContent = '⟳ Open Food Facts';
+  $('recheckRkBtn').textContent = '⟳ Роскачество';
+  $('recheckCommunityBtn').textContent = '⟳ Сообщество';
+}
+
+// применяет найденный извне состав к уже открытому результату и обновляет историю
+function applyRecheckedComposition(sourceLabel, ingredientsText, extraMeta){
+  if(!lastRenderedCode) return;
+  const flags = classifyOcrText(ingredientsText);
+  const title = $('prodName').textContent;
+  const existingMeta = $('metaRow').innerHTML;
+  const metaHtml = existingMeta + (extraMeta || '');
+
+  saveToHistory({
+    code: lastRenderedCode, title, subtitle: lastRenderedCode,
+    level: riskLevel(flags), flags, ingredientsText, imgUrl: $('prodImg').src || null, metaHtml,
+    compositionSource: sourceLabel, ts: Date.now()
+  });
+
+  renderResult({
+    code: lastRenderedCode, title, subtitle: lastRenderedCode, flags,
+    ingredientsText, imgUrl: $('prodImg').classList.contains('empty') ? null : $('prodImg').src,
+    metaHtml, compositionSource: sourceLabel, vibrate: true
+  });
+}
+
+async function recheckSource(btnId, label, fetchFn){
+  const btn = $(btnId);
+  const code = lastRenderedCode;
+  if(!code || btn.classList.contains('busy')) return;
+  btn.classList.add('busy');
+  btn.textContent = '…';
+  try{
+    const result = await fetchFn(code);
+    if(result && result.text){
+      btn.classList.add('found');
+      btn.textContent = '✓ найдено';
+      applyRecheckedComposition(label, result.text, result.extraMeta);
+    } else {
+      btn.classList.add('empty');
+      btn.textContent = '— пусто';
+    }
+  }catch(e){
+    btn.classList.add('empty');
+    btn.textContent = '— ошибка';
+  }finally{
+    btn.classList.remove('busy');
+  }
+}
+
+$('recheckOffBtn').addEventListener('click', ()=> recheckSource('recheckOffBtn', 'Open Food Facts', async (code)=>{
+  const data = await fetchWithFallback(code);
+  const ok = data && data.status===1 && data.product;
+  if(!ok) return null;
+  const text = data.product.ingredients_text_ru || data.product.ingredients_text || '';
+  return text ? {text} : null;
+}));
+
+$('recheckRkBtn').addEventListener('click', ()=> recheckSource('recheckRkBtn', 'Роскачество', async (code)=>{
+  const raw = await fetchRoskachestvo(code);
+  if(!raw.found) return null;
+  const info = extractRoskachestvo(raw.data);
+  if(!info || !info.compositionText) return null;
+  let extraMeta = '';
+  if(info.rating!=null) extraMeta += `<div class="chip">Роскачество: ${info.rating}★</div>`;
+  if(info.hasQualityMark) extraMeta += `<div class="chip">Знак качества РФ</div>`;
+  return {text: info.compositionText, extraMeta};
+}));
+
+$('recheckCommunityBtn').addEventListener('click', ()=> recheckSource('recheckCommunityBtn', 'сообщество', async (code)=>{
+  const data = await fetchCommunity(code);
+  if(!data || !data.ingredientsText) return null;
+  return {text: data.ingredientsText, extraMeta: `<div class="chip">⚠ Добавлено сообществом · не проверено лабораторно</div>`};
+}));
+
+$('noCompPhotoBtn').addEventListener('click', ()=> $('photoBtn').click());
+$('noCompProposeBtn').addEventListener('click', ()=>{
+  if(lastRenderedCode) window.open(proposeCompositionUrl(lastRenderedCode), '_blank');
+});
 
 // --- размер шрифта ---
 const fontSlider = $('fontSlider');
@@ -1118,7 +1286,7 @@ async function lookup(code, forceRefresh){
       renderResult({
         code: cached.code, title: cached.title, subtitle: cached.subtitle, flags: cached.flags,
         ingredientsText: cached.ingredientsText, imgUrl: cached.imgUrl,
-        metaHtml: cached.metaHtml, cachedTs: cached.ts, vibrate: true
+        metaHtml: cached.metaHtml, compositionSource: cached.compositionSource, cachedTs: cached.ts, vibrate: true
       });
       return;
     }
@@ -1170,14 +1338,14 @@ async function lookup(code, forceRefresh){
       return;
     }
 
-    let flags = [], ingredientsText = '', title = null, imgUrl = null;
+    let flags = [], ingredientsText = '', title = null, imgUrl = null, compositionSource = null;
     const meta = [];
 
     if(offOk){
       const product = offData.product;
       const off = classify(product);
-      flags = off.flags;
       ingredientsText = product.ingredients_text_ru || product.ingredients_text || '';
+      if(ingredientsText){ flags = off.flags; compositionSource = 'Open Food Facts'; }
       title = product.product_name_ru || product.product_name || null;
       imgUrl = product.image_front_url;
       if(product.nova_group) meta.push(`<div class="chip">NOVA ${product.nova_group}${product.nova_group>=4?' · ультра-обработанный':''}</div>`);
@@ -1195,6 +1363,7 @@ async function lookup(code, forceRefresh){
       if(!ingredientsText && rk.compositionText){
         ingredientsText = rk.compositionText;
         flags = classifyOcrText(rk.compositionText);
+        compositionSource = 'Роскачество';
       }
     }
 
@@ -1204,6 +1373,7 @@ async function lookup(code, forceRefresh){
       if(!title) title = community.title;
       ingredientsText = community.ingredientsText;
       flags = classifyOcrText(community.ingredientsText);
+      compositionSource = 'сообщество';
       meta.push(`<div class="chip">⚠ Добавлено сообществом · не проверено лабораторно</div>`);
     }
 
@@ -1212,11 +1382,11 @@ async function lookup(code, forceRefresh){
 
     saveToHistory({
       code, title: finalTitle, subtitle: code,
-      level: riskLevel(flags), flags, ingredientsText, imgUrl, metaHtml,
+      level: riskLevel(flags), flags, ingredientsText, imgUrl, metaHtml, compositionSource,
       ts: Date.now()
     });
 
-    renderResult({ code, title: finalTitle, subtitle: code, flags, ingredientsText, imgUrl, metaHtml, vibrate: true });
+    renderResult({ code, title: finalTitle, subtitle: code, flags, ingredientsText, imgUrl, metaHtml, compositionSource, vibrate: true });
   }catch(e){
     showRetryError('Непредвиденная ошибка при поиске товара. ', ()=> lookup(code, true));
   }finally{
@@ -1332,7 +1502,7 @@ function renderHistoryList(){
       renderResult({
         code: item.code, title: item.title, subtitle: item.subtitle, flags: item.flags,
         ingredientsText: item.ingredientsText, imgUrl: item.imgUrl,
-        metaHtml: item.metaHtml, cachedTs: item.ts, vibrate: false
+        metaHtml: item.metaHtml, compositionSource: item.compositionSource, cachedTs: item.ts, vibrate: false
       });
     });
     container.appendChild(row);
@@ -1497,7 +1667,7 @@ $('photoInput').addEventListener('change', async (e)=>{
     saveToHistory({
       code: null, title: 'Распознано с фото', subtitle: 'OCR · без штрихкода',
       level: riskLevel(flags), flags, ingredientsText: text.trim(), imgUrl: null, metaHtml,
-      ts: Date.now()
+      compositionSource: 'распознавание фото', ts: Date.now()
     });
 
     renderResult({
@@ -1507,6 +1677,7 @@ $('photoInput').addEventListener('change', async (e)=>{
       ingredientsText: text.trim(),
       imgUrl: null,
       metaHtml,
+      compositionSource: 'распознавание фото',
       vibrate: true
     });
   }catch(err){
