@@ -85,8 +85,11 @@
     font-family:'IBM Plex Mono',monospace;
     font-size:0.75rem;
     font-weight:600;
+    cursor:pointer;
   }
+  .community-stat:active{opacity:0.85;transform:scale(0.99);}
   .community-stat b{font-family:'Space Grotesk',sans-serif;font-size:0.95rem;}
+  .community-stat-arrow{margin-left:auto;font-size:1rem;opacity:0.85;flex-shrink:0;}
 
   .font-panel{
     display:flex;
@@ -637,7 +640,7 @@
     </button>
   </header>
 
-  <div id="communityStat" class="community-stat top-fixed" style="display:none;"></div>
+  <div id="communityStat" class="community-stat top-fixed" role="button" tabindex="0" title="Открыть форму добавления состава в базу сообщества" style="display:none;"></div>
 
   <div class="font-panel top-fixed">
     <span class="fp-label">Размер текста</span>
@@ -1243,15 +1246,32 @@ async function fetchCommunityCount(){
   }
 }
 
+// корректное склонение русских числительных: 1 товар / 2-4 товара / 5-20 товаров / 21 товар / 22 товара...
+function pluralRu(n, one, few, many){
+  const mod10 = n % 10, mod100 = n % 100;
+  if(mod10===1 && mod100!==11) return one;
+  if(mod10>=2 && mod10<=4 && (mod100<12 || mod100>14)) return few;
+  return many;
+}
+
 async function renderCommunityStat(){
   const count = await fetchCommunityCount();
   const el = $('communityStat');
   if(count === null){ el.style.display = 'none'; return; }
   el.innerHTML = count > 0
-    ? `🌱 Сообщество добавило: <b>${count}</b> ${count===1?'товар':(count<5?'товара':'товаров')}`
-    : `🌱 Пока никто не добавил товар в базу сообщества — <a href="https://github.com/${COMMUNITY_REPO}/issues/new?template=propose-composition.yml" target="_blank" rel="noopener" style="color:#fff;text-decoration:underline;">будь первым</a>`;
+    ? `🌱 Сообщество добавило: <b>${count}</b> ${pluralRu(count,'товар','товара','товаров')} <span class="community-stat-arrow">›</span>`
+    : `🌱 Пока никто не добавил товар в базу сообщества — будь первым <span class="community-stat-arrow">›</span>`;
   el.style.display = 'flex';
 }
+
+$('communityStat').addEventListener('click', ()=>{
+  const typedCode = $('barcodeInput').value.trim().replace(/\D/g,'');
+  const url = isValidBarcode(typedCode) ? proposeCompositionUrl(typedCode) : proposeCompositionUrl('');
+  location.href = url;
+});
+$('communityStat').addEventListener('keydown', (e)=>{
+  if(e.key==='Enter' || e.key===' '){ e.preventDefault(); $('communityStat').click(); }
+});
 
 async function fetchWithFallback(barcode){
   const fields = 'product_name,product_name_ru,ingredients_text,ingredients_text_ru,additives_tags,ingredients_analysis_tags,nova_group,image_front_url,nutriscore_grade';
