@@ -37,7 +37,7 @@ jobs:
 
             const barcodeRaw = extractField('Штрихкод \\(EAN-13/UPC\\)');
             const title = extractField('Название товара');
-            const composition = extractField('Состав \\(переписать с упаковки дословно\\)');
+            let composition = extractField('Состав \\(переписать с упаковки дословно\\)');
             const photo = extractField('Ссылка на фото упаковки \\(необязательно\\)');
 
             const barcode = (barcodeRaw.match(/\d{6,14}/) || [null])[0];
@@ -46,6 +46,25 @@ jobs:
               core.setFailed('Не удалось распарсить обязательные поля issue (штрихкод/название/состав). Проверь формат issue вручную.');
               return;
             }
+
+            // автокоррекция частых опечаток в названиях добавок/ингредиентов —
+            // список сознательно короткий и однозначный, чтобы не менять смысл случайно
+            const fixes = [
+              [/ванелин/gi, 'ванилин'],
+              [/лицитин/gi, 'лецитин'],
+              [/бензонат/gi, 'бензоат'],
+              [/глютамат/gi, 'глутамат'],
+              [/сахороза/gi, 'сахароза'],
+              [/аскарбиновая/gi, 'аскорбиновая'],
+              [/цитрат[ыи] натрий/gi, 'цитраты натрия'],
+            ];
+            const corrections = [];
+            fixes.forEach(([re, right])=>{
+              if(re.test(composition)){
+                corrections.push(right);
+                composition = composition.replace(re, right);
+              }
+            });
 
             const fs = require('fs');
             const path = require('path');
@@ -66,6 +85,7 @@ jobs:
 
             core.setOutput('barcode', barcode);
             core.setOutput('filePath', filePath);
+            core.setOutput('corrections', corrections.join(', '));
 
       - name: Commit and push
         run: |
@@ -81,11 +101,15 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            const corrections = '${{ steps.parse.outputs.corrections }}';
+            const correctionsNote = corrections
+              ? '\n\n🔤 Автоматически исправлены опечатки в тексте состава: ' + corrections + '.'
+              : '';
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: '✅ Спасибо! Состав добавлен в базу СОСТАВ.SCAN (штрихкод `' + '${{ steps.parse.outputs.barcode }}' + '`). Обновление появится в приложении в течение пары минут.'
+              body: '✅ Спасибо! Состав добавлен в базу СОСТАВ.SCAN (штрихкод `' + '${{ steps.parse.outputs.barcode }}' + '`). Обновление появится в приложении в течение пары минут.' + correctionsNote
             });
             await github.rest.issues.update({
               owner: context.repo.owner,
