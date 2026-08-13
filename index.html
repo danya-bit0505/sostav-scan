@@ -11,7 +11,7 @@
 <title>СОСТАВ.SCAN — проверка состава</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/zxing-library/0.20.0/index.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/zxing-library/0.20.0/index.min.js" onerror="window.__zxingLoadFailed=true"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
   :root{
@@ -1644,6 +1644,13 @@ function ensureOcrWorker(lang, statusEl){
 // предзагрузка движка распознавания сразу при открытии страницы — не дожидаясь фото
 window.addEventListener('load', ()=>{
   setTimeout(()=> ensureOcrWorker(ocrLang, null).catch(()=>{}), 600);
+  // если основной CDN для сканера штрихкода не загрузился (актуально для Safari, где своего
+  // BarcodeDetector нет вообще) — тихо пробуем резервный в фоне, не дожидаясь клика по камере
+  setTimeout(()=>{
+    if(!window.ZXing && typeof loadScript==='function'){
+      loadScript('https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js').catch(()=>{});
+    }
+  }, 1200);
 });
 
 renderCommunityStat();
@@ -1880,16 +1887,36 @@ async function startCamNative(){
   }
 }
 
-$('camBtn').addEventListener('click', ()=>{
+function loadScript(src){
+  return new Promise((resolve, reject)=>{
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+$('camBtn').addEventListener('click', async ()=>{
   const wrap = $('camWrap');
   if(wrap.classList.contains('active')){ stopCam(); return; }
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
     $('status').textContent = explainCamError(null);
     return;
   }
+
+  // основной CDN мог не загрузиться (сеть/блокировка) — пробуем резервный прямо сейчас,
+  // это особенно актуально для Safari, где нет нативного BarcodeDetector и вся камера держится на ZXing
+  if(!window.ZXing){
+    $('status').textContent = 'Загружаю модуль сканера…';
+    try{
+      await loadScript('https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js');
+    }catch(e){ /* попробуем всё равно ниже — вдруг первый CDN всё же успел досчитаться */ }
+  }
+
   if(window.ZXing){ startCamZXing(); }
   else if('BarcodeDetector' in window){ startCamNative(); }
-  else { $('status').textContent = 'Камера-сканер недоступен в этом браузере, введи код вручную.'; }
+  else { $('status').textContent = 'Не удалось загрузить модуль сканера (проблема сети или блокировка CDN). Введи штрихкод вручную либо сфотографируй состав.'; }
 });
 
 // --- PWA: устанавливаемое приложение + офлайн-доступ к самому интерфейсу и истории ---
