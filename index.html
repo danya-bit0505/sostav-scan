@@ -1805,19 +1805,37 @@ async function startCamZXing(){
   zxingReader = new ZXing.BrowserMultiFormatReader(hints);
   scanning = true;
   try{
-    await zxingReader.decodeFromConstraints(
-      {video:{facingMode:'environment', focusMode:'continuous', advanced:[{focusMode:'continuous'}]}},
-      video,
-      (result, err)=>{
-        if(!scanning) return;
-        if(result){
-          $('barcodeInput').value = result.getText();
-          vibrateOk();
-          stopCam();
-          $('checkBtn').click();
+    try{
+      await zxingReader.decodeFromConstraints(
+        {video:{facingMode:'environment', advanced:[{focusMode:'continuous'}]}},
+        video,
+        (result, err)=>{
+          if(!scanning) return;
+          if(result){
+            $('barcodeInput').value = result.getText();
+            vibrateOk();
+            stopCam();
+            $('checkBtn').click();
+          }
         }
-      }
-    );
+      );
+    }catch(firstErr){
+      // некоторые браузеры (например Safari) могут отклонять запрос из-за незнакомых
+      // параметров камеры — пробуем совсем базовый вариант без них
+      await zxingReader.decodeFromConstraints(
+        {video:{facingMode:'environment'}},
+        video,
+        (result, err)=>{
+          if(!scanning) return;
+          if(result){
+            $('barcodeInput').value = result.getText();
+            vibrateOk();
+            stopCam();
+            $('checkBtn').click();
+          }
+        }
+      );
+    }
   }catch(e){
     $('status').textContent = explainCamError(e);
     stopCam();
@@ -1828,7 +1846,11 @@ async function startCamNative(){
   const wrap = $('camWrap');
   $('status').textContent = '';
   try{
-    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment', focusMode:'continuous', advanced:[{focusMode:'continuous'}]}});
+    try{
+      stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment', advanced:[{focusMode:'continuous'}]}});
+    }catch(firstErr){
+      stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    }
     const video = $('camVideo');
     video.srcObject = stream;
     await video.play();
