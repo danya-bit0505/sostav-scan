@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#0E7FA8">
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" href="./icon-192.png" type="image/png">
@@ -873,11 +873,14 @@ function classifyOcrText(rawText){
   const lower = rawText.toLowerCase();
 
   // ищем коды вида E102 / Е102 / E-102 / e 950 (латиница и кириллица);
-  // negative lookbehind исключает случаи вроде "the 300" или "France 950", где "e"/"е" — конец обычного слова
-  const codeRegex = /(?<![a-zа-яA-ZА-Я])[eEеЕ][\s-]?(\d{3,4})/g;
+  // предыдущий символ захватываем группой и проверяем в коде (а не через lookbehind в регулярке —
+  // lookbehind не поддерживается в Safari до версии 16.4, из-за чего весь скрипт падал бы на старых iPhone)
+  // исключает случаи вроде "the 300" или "France 950", где "e"/"е" — конец обычного слова
+  const codeRegex = /([a-zа-яA-ZА-Я]?)[eEеЕ][\s-]?(\d{3,4})/g;
   let m;
   while((m = codeRegex.exec(rawText))){
-    const code = 'e'+m[1];
+    if(m[1]) continue; // перед e/е стоит буква — это конец обычного слова, а не код добавки
+    const code = 'e'+m[2];
     if(RISK_DB[code] && !seen.has(code)){
       seen.add(code);
       flags.push({code:code.toUpperCase(), ...RISK_DB[code]});
@@ -905,6 +908,19 @@ function classifyOcrText(rawText){
 }
 
 const $ = id=>document.getElementById(id);
+
+// AbortSignal.timeout() появился только в Safari 16 (iOS 16+) — на более старых
+// устройствах (например iPhone 6s, максимум iOS 15) его просто нет и вызов сломает
+// весь запрос. Делаем универсальную замену через AbortController, который поддерживается
+// значительно дольше (с Safari 11.1).
+function abortTimeoutSignal(ms){
+  if(typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'){
+    return AbortSignal.timeout(ms);
+  }
+  const controller = new AbortController();
+  setTimeout(()=> controller.abort(), ms);
+  return controller.signal;
+}
 
 function showRetryError(msg, actions){
   const el = $('status');
@@ -1166,7 +1182,7 @@ async function fetchRoskachestvo(barcode){
   ];
 
   const tryOne = async (url, timeoutMs)=>{
-    const res = await fetch(url, {signal: AbortSignal.timeout(timeoutMs)});
+    const res = await fetch(url, {signal: abortTimeoutSignal(timeoutMs)});
     if(res.status === 404) return {connected:true, found:false, data:null};
     if(!res.ok) throw new Error('status_'+res.status);
     const data = await res.json();
@@ -1216,7 +1232,7 @@ async function fetchCommunity(barcode){
     // файлы могут ещё несколько минут отдавать закэшированный 404 без этого параметра
     const res = await fetch(
       `https://raw.githubusercontent.com/${COMMUNITY_REPO}/main/data/community/${barcode}.json?_=${Date.now()}`,
-      {signal: AbortSignal.timeout(6000), cache: 'no-store'}
+      {signal: abortTimeoutSignal(6000), cache: 'no-store'}
     );
     if(!res.ok) return null;
     const data = await res.json();
@@ -1245,7 +1261,7 @@ async function fetchCommunityCount(){
   try{
     const res = await fetch(
       `https://api.github.com/repos/${COMMUNITY_REPO}/contents/data/community`,
-      {signal: AbortSignal.timeout(6000), headers:{'Accept':'application/vnd.github+json'}}
+      {signal: abortTimeoutSignal(6000), headers:{'Accept':'application/vnd.github+json'}}
     );
     // 404 означает, что папки ещё нет — то есть добавленных товаров пока 0, это не ошибка
     if(res.status === 404){
@@ -1304,7 +1320,7 @@ async function fetchWithFallback(barcode){
   const proxy3 = 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(directUrl);
   const proxy4 = 'https://cors.eu.org/' + directUrl;
 
-  const tryFetch = (url, timeoutMs)=> fetch(url, {signal: AbortSignal.timeout(timeoutMs)})
+  const tryFetch = (url, timeoutMs)=> fetch(url, {signal: abortTimeoutSignal(timeoutMs)})
     .then(res=> res.ok ? res.json() : Promise.reject(new Error('status_'+res.status)));
 
   // пробуем все пути параллельно, берём первый успешный ответ
