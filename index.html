@@ -575,6 +575,7 @@
     margin-bottom:14px;
   }
   .info-block-warn{border-color:var(--warn);}
+  .info-block-accent{border-color:var(--accent);background:var(--panel);}
   .info-block-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.95rem;margin-bottom:10px;}
   .info-block p{font-size:0.86rem;line-height:1.5;margin:0;color:var(--text);}
   .info-steps{margin:0;padding-left:20px;font-size:0.86rem;line-height:1.7;color:var(--text);}
@@ -864,6 +865,27 @@
         <li>История сканирований и безопасная полка работают офлайн</li>
         <li>Сами проверки состава по-прежнему требуют интернет — без него нельзя обратиться к базам</li>
       </ul>
+    </div>
+
+    <div class="info-block info-block-accent">
+      <div class="info-block-title">🌱 Помоги пополнить базу сообщества</div>
+      <p>Если состав товара нигде не находится — скорее всего, его просто ещё никто не добавил. Особенно это касается небольших региональных производителей. Если увидел товар без состава — потрать одну минуту и предложи его сам.</p>
+
+      <div class="info-block-title" style="margin-top:16px;font-size:0.85rem;">Как подставляется штрихкод</div>
+      <ul class="info-steps">
+        <li>Если после сканирования товар <b>не нашёлся нигде</b>, и при этом удалось подключиться ко <b>всем</b> базам данных (то есть точно известно, что состава действительно нет ни в одной из них) — кнопка «Предложить состав» появляется сама прямо под сообщением об ошибке, штрихкод в форму подставится автоматически</li>
+        <li>Если подключиться получилось не ко всем базам (например, проблема с сетью) — эта кнопка не появится, потому что не до конца ясно, есть товар в базах или нет. В этом случае предложить состав всё равно можно: нажми на <b>зелёную кнопку сообщества</b> вверху экрана — она тоже подставит штрихкод автоматически, если он остался в поле ввода</li>
+      </ul>
+
+      <div class="info-block-title" style="margin-top:16px;font-size:0.85rem;">Как заполнять саму форму</div>
+      <ul class="info-steps">
+        <li><b>Штрихкод</b> — обычно подставлен сам, проверь, что цифры совпадают с упаковкой</li>
+        <li><b>Название товара</b> — как написано на упаковке, с объёмом/весом, если есть</li>
+        <li><b>Состав</b> — перепиши <b>дословно</b>, как на этикетке, ничего не сокращай и не пересказывай своими словами — это важно для точности проверки</li>
+        <li>Остальные поля (Assignees, Labels, Projects, Milestone) трогать не нужно — можно сразу нажимать <b>Create</b></li>
+      </ul>
+
+      <button type="button" class="btn btn-primary" id="infoProposeBtn" style="margin-top:14px;">Предложить состав в базу</button>
     </div>
   </div>
 </div>
@@ -1695,6 +1717,7 @@ $('infoBtn').addEventListener('click', ()=>{
   $('infoScreen').scrollTop = 0;
 });
 $('infoBackBtn').addEventListener('click', ()=>{ $('infoScreen').classList.remove('show'); });
+$('infoProposeBtn').addEventListener('click', ()=>{ location.href = proposeCompositionUrl(''); });
 
 $('historyScreen').querySelector('.history-tabs').addEventListener('click', (e)=>{
   const btn = e.target.closest('.hist-tab');
