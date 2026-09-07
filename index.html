@@ -375,6 +375,8 @@
   .screen-rescan svg{width:22px;height:22px;}
   .screen-rescan:active{transform:scale(0.94);}
 
+  .header-icons{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+
   .icon-btn{
     width:36px;height:36px;
     border-radius:50%;
@@ -388,6 +390,14 @@
   }
   .icon-btn svg{width:17px;height:17px;}
   .icon-btn:active{transform:scale(0.94);}
+
+  .icon-btn-accent{
+    width:40px;height:40px;
+    border-color:var(--accent);
+    background:var(--accent);
+    box-shadow:0 0 0 4px rgba(14,127,168,0.18);
+  }
+  .icon-btn-accent svg{width:20px;height:20px;}
 
   .stamp-wrap{display:flex;justify-content:center;margin:6px 0 18px;}
   .stamp{
@@ -545,6 +555,31 @@
   #historyInner{max-width:520px;margin:0 auto;padding:78px 16px 32px;}
   .history-title{font-family:'Space Grotesk',sans-serif;font-size:1.1rem;margin:0 0 14px;}
 
+  #infoScreen{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:var(--bg);
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    z-index:100;
+  }
+  #infoScreen.show{display:block;}
+  #infoInner{max-width:520px;margin:0 auto;padding:78px 16px 32px;}
+  .info-lead{font-size:0.9rem;color:var(--muted);line-height:1.5;margin:0 0 18px;}
+  .info-block{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:16px;
+    margin-bottom:14px;
+  }
+  .info-block-warn{border-color:var(--warn);}
+  .info-block-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.95rem;margin-bottom:10px;}
+  .info-block p{font-size:0.86rem;line-height:1.5;margin:0;color:var(--text);}
+  .info-steps{margin:0;padding-left:20px;font-size:0.86rem;line-height:1.7;color:var(--text);}
+  .info-steps b{color:var(--accent);}
+
   .history-tabs{display:flex;gap:8px;margin-bottom:16px;}
   .hist-tab{
     flex:1;
@@ -632,12 +667,21 @@
 
   <header class="top-fixed">
     <div class="logo">СОСТАВ<span>.</span>SCAN<small>ПРОВЕРКА ДОБАВОК ПО ШТРИХКОДУ</small></div>
-    <button class="icon-btn" id="historyBtn" title="История и безопасная полка">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="9"/>
-        <path d="M12 7v5l3.5 2"/>
-      </svg>
-    </button>
+    <div class="header-icons">
+      <button class="icon-btn icon-btn-accent" id="infoBtn" title="Как установить приложение на телефон">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/>
+          <line x1="12" y1="10.5" x2="12" y2="16.5"/>
+          <circle cx="12" cy="7.2" r="1" fill="currentColor" stroke="none"/>
+        </svg>
+      </button>
+      <button class="icon-btn" id="historyBtn" title="История и безопасная полка">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M12 7v5l3.5 2"/>
+        </svg>
+      </button>
+    </div>
   </header>
 
   <div id="communityStat" class="community-stat top-fixed" role="button" tabindex="0" title="Открыть форму добавления состава в базу сообщества" style="display:none;"></div>
@@ -774,6 +818,52 @@
     </div>
     <div id="historyList"></div>
     <button id="historyClearBtn" class="btn-clear-history" type="button">Очистить историю</button>
+  </div>
+</div>
+
+<div id="infoScreen">
+  <button id="infoBackBtn" class="screen-back" title="Назад">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M15 5l-7 7 7 7"/>
+    </svg>
+  </button>
+  <div id="infoInner">
+    <h2 class="history-title">Установка на телефон</h2>
+    <p class="info-lead">Установи СОСТАВ.SCAN как обычное приложение — появится иконка на рабочем столе, а часть функций (история, безопасная полка) будет работать даже без интернета.</p>
+
+    <div class="info-block">
+      <div class="info-block-title">📱 iPhone (Safari)</div>
+      <ol class="info-steps">
+        <li>Открой сайт в браузере <b>Safari</b> (обязательно в нём, не в другом браузере)</li>
+        <li>Нажми кнопку <b>«Поделиться»</b> (квадрат со стрелкой вверх) внизу экрана</li>
+        <li>Пролистай вниз и выбери <b>«На экран «Домой»»</b></li>
+        <li>Нажми <b>«Добавить»</b> в правом верхнем углу</li>
+      </ol>
+    </div>
+
+    <div class="info-block">
+      <div class="info-block-title">🤖 Android (Chrome)</div>
+      <ol class="info-steps">
+        <li>Открой сайт в <b>Chrome</b></li>
+        <li>Нажми на три точки <b>⋮</b> в правом верхнем углу</li>
+        <li>Выбери <b>«Установить приложение»</b> (или «Добавить на главный экран»)</li>
+        <li>Подтверди установку</li>
+      </ol>
+    </div>
+
+    <div class="info-block info-block-warn">
+      <div class="info-block-title">⚠ Яндекс Браузер</div>
+      <p>Яндекс Браузер на Android пока не поддерживает полноценную установку сторонних сайтов как приложений (только для собственных сервисов Яндекса) — это ограничение самого браузера, официально подтверждённое Яндексом. Если хочешь именно установленное приложение с иконкой на рабочем столе — используй Chrome. В самом Яндексе сайтом можно пользоваться как обычно, просто без установки.</p>
+    </div>
+
+    <div class="info-block">
+      <div class="info-block-title">Что даёт установка</div>
+      <ul class="info-steps">
+        <li>Иконка на рабочем столе, открывается без адресной строки, на весь экран</li>
+        <li>История сканирований и безопасная полка работают офлайн</li>
+        <li>Сами проверки состава по-прежнему требуют интернет — без него нельзя обратиться к базам</li>
+      </ul>
+    </div>
   </div>
 </div>
 
@@ -1598,6 +1688,12 @@ $('historyBtn').addEventListener('click', ()=>{
   $('historyScreen').scrollTop = 0;
 });
 $('historyBackBtn').addEventListener('click', ()=>{ $('historyScreen').classList.remove('show'); });
+
+$('infoBtn').addEventListener('click', ()=>{
+  $('infoScreen').classList.add('show');
+  $('infoScreen').scrollTop = 0;
+});
+$('infoBackBtn').addEventListener('click', ()=>{ $('infoScreen').classList.remove('show'); });
 
 $('historyScreen').querySelector('.history-tabs').addEventListener('click', (e)=>{
   const btn = e.target.closest('.hist-tab');
